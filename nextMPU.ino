@@ -1,21 +1,20 @@
 #include <Wire.h>
 #include <MPU9250_asukiaaa.h>
 
-// -------- XIAO ESP32S3 I2C pins --------
+// XIAO ESP32S3 I2C pins
 #define SDA_PIN 5
 #define SCL_PIN 6
 #define I2C_HZ  400000   // Use 100000 if you see I2C NACKs
-// ---------------------------------------
 
 MPU9250_asukiaaa imu;
 
 uint8_t sensorId = 0;
 
-// ---------- Calibration storage ----------
+// Calibration storage
 float gyroBiasX=0, gyroBiasY=0, gyroBiasZ=0;   // deg/s
-float accBiasX=0,  accBiasY=0,  accBiasZ=0;    // g (Z tuned to +1g when flat)
+float accBiasX=0,  accBiasY=0,  accBiasZ=0;    // g 
 
-// ---------- median filter (5 samples) ----------
+//  median filter
 template<size_t N>
 struct Median {
   float buf[N]; uint8_t idx=0; bool primed=false;
@@ -30,7 +29,7 @@ struct Median {
 Median<5> gxMed, gyMed, gzMed;
 Median<5> axMed, ayMed, azMed;
 
-// ---------- EMA (accel smoothing) ----------
+// EMA (accel smoothing)
 struct EMA {
   float y=0; bool init=false;
   float update(float x, float alpha){
@@ -40,7 +39,7 @@ struct EMA {
   }
 } axEMA, ayEMA, azEMA;
 
-// ---------- simple 1D Kalman filter per gyro axis ----------
+// simple 1D Kalman filter per gyro axis
 struct Kalman1D {
   float x=0.0f;   // estimate
   float P=1.0f;   // covariance
@@ -61,7 +60,7 @@ struct Kalman1D {
 };
 Kalman1D kx(0.03f, 0.60f), ky(0.03f, 0.60f), kz(0.03f, 0.60f);
 
-// ---------- tunables ----------
+// tunables 
 const uint16_t CAL_SAMPLES   = 1000;    // more samples = better bias
 const uint16_t CAL_DELAY_MS  = 4;       // ~250 Hz during calibration
 const uint8_t  LOOP_AVG_N    = 5;       // sub-samples per loop (fast average)
@@ -70,7 +69,7 @@ const float    ACC_EMA_ALPHA = 0.18f;   // 0.1–0.3
 const float    OUTLIER_GYR_DPS = 20.0f; // reject sudden > this diff vs previous
 const float    OUTLIER_ACC_G   = 0.30f;
 
-// ---- helpers to read once ----
+// helpers to read once
 bool readAccelOnce(float& x,float& y,float& z){
   if(imu.accelUpdate()!=0) return false;
   x = imu.accelX(); y = imu.accelY(); z = imu.accelZ(); // g
@@ -82,7 +81,7 @@ bool readGyroOnce(float& x,float& y,float& z){
   return true;
 }
 
-// ---- sub-sample averaged reads with outlier clamp ----
+// sub-sample averaged reads with outlier clamp
 bool readAccelAvg(float& x,float& y,float& z){
   float sx=0, sy=0, sz=0;
   static bool havePrev=false; static float px=0,py=0,pz=0;
@@ -120,7 +119,7 @@ bool readGyroAvg(float& x,float& y,float& z){
   return true;
 }
 
-// ---- stationary calibration: gyro + accel (board flat & still) ----
+// stationary calibration: gyro + accel (board flat & still)
 void calibrateStationary(uint16_t samples=CAL_SAMPLES){
   Serial.println("\n[Cal] Keep board FLAT & STILL …");
   delay(1500);
@@ -164,7 +163,7 @@ void calibrateStationary(uint16_t samples=CAL_SAMPLES){
   }
 }
 
-// ---- auto re-zero gyro when stationary (handles temp drift) ----
+// auto re-zero gyro when stationary (handles temp drift)
 void autoRezeroGyroIfStill() {
   const float GYR_STILL_DPS   = 0.45f;   // all |gyro| below → still
   const float ACC_MAG_TARGET  = 1.0f;    // |acc| ≈ 1g when still
@@ -243,7 +242,7 @@ void setup() {
 }
 
 void loop() {
-  // ---- Accel: sub-avg -> bias -> median5 -> EMA ----
+  // Accel: sub-avg -> bias -> median5 -> EMA
   float ax,ay,az;
   if(readAccelAvg(ax,ay,az)){
     float ax_c = ax - accBiasX;
@@ -266,7 +265,7 @@ void loop() {
     Serial.println("accel read fail");
   }
 
-  // ---- Gyro: sub-avg -> bias -> median5 -> Kalman ----
+  // Gyro: sub-avg -> bias -> median5 -> Kalman
   float gx,gy,gz;
   if(readGyroAvg(gx,gy,gz)){
     float gx_c = gx - gyroBiasX;
